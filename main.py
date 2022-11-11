@@ -1,20 +1,24 @@
 import argparse
+import re
 import math
+
 from dotenv import load_dotenv
+from config.env import Env
 from api import getTranslationsFor
 from typing import List, Dict
 from fileutil import readFile, writeFile
 load_dotenv()
 
 BATCH_SIZE = 20
+LOCK_FILE_PREFIX = re.sub("\W", "-", Env.getRootDir())+"-"
 
 
 def loadDefaultI18n():
-  return readFile("translations/en.json")
+  return readFile(f"{Env.getRootDir()}/en.json")
 
 
 def getKeys(allKeys: List[str], languageKey: str):
-  filename = ".lock/" + languageKey + ".mo"
+  filename = f".lock/{LOCK_FILE_PREFIX}" + languageKey + ".mo"
   final_keys: List[str] = []
   try:
     translatedMap: Dict = readFile(filename)
@@ -30,7 +34,7 @@ def getKeys(allKeys: List[str], languageKey: str):
 
 
 def updateLockFile(successKeys, languageKey):
-  filename = ".lock/" + languageKey + ".mo"
+  filename = f".lock/{LOCK_FILE_PREFIX}" + languageKey + ".mo"
   lockMap: Dict = readFile(filename)
   for key in successKeys:
     lockMap.update({key: 1})
@@ -39,7 +43,7 @@ def updateLockFile(successKeys, languageKey):
 
 
 def updateTranslationFile(apiResponse, keys, languageKey, retried=False):
-  filename = "translations/"+languageKey+".json"
+  filename = f"{Env.getRootDir()}/"+languageKey+".json"
   try:
     translation: Dict = {}
     translation = readFile(filename)
@@ -56,7 +60,21 @@ def updateTranslationFile(apiResponse, keys, languageKey, retried=False):
       print("Oops there was some error creating the file", e)
 
 
+def validLanguages(targetLangs: List[str]):
+  jsonMap: Dict = readFile("valid_languages.json")
+  validLanguages = list(
+      map(lambda x: x.get("language"), jsonMap["data"]["languages"]))
+  return set(targetLangs).issubset(set(validLanguages))
+
+
 def run(target: List[str] = None, verbose=False):
+  target.remove("en")
+  if len(target) < 1:
+    print("No target found: You can not use 'en' as target language")
+    return
+  if not validLanguages(target):
+    print("Given targets does not seems to be a valid language")
+    return
   if verbose:
     print("Target languages", target)
     print("Loading default translation file i.e 'en.json'")
@@ -101,4 +119,7 @@ if __name__ == "__main__":
                       required=True, dest="target", type=str)
   parser.add_argument("-v", "--verbose", action="store_true")
   args = parser.parse_args()
-  run(target=str(args.target).split(sep=","), verbose=args.verbose)
+  try:
+    run(target=str(args.target).split(sep=","), verbose=args.verbose)
+  except Exception as e:
+    print(e)

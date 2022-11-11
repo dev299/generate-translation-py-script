@@ -13,3 +13,6 @@ class Env():
 
   def isMockEnabled():
     return Env.get("MOCK") == "True"
+
+  def getRootDir():
+    return Env.get("TRANSLATION_ROOT_DIR")
