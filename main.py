@@ -68,10 +68,6 @@ def validLanguages(targetLangs: List[str]):
 
 
 def run(target: List[str] = None, verbose=False):
-  target.remove("en")
-  if len(target) < 1:
-    print("No target found: You can not use 'en' as target language")
-    return
   if not validLanguages(target):
     print("Given targets does not seems to be a valid language")
     return
