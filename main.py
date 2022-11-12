@@ -42,7 +42,7 @@ def update_lock_file(successKeys, languageKey):
   lockMap: Dict = load_json(filename)
   for key in successKeys:
     lockMap.update({key: 1})
-  #write_json(filename, lockMap)
+  write_json(filename, lockMap)
 
 
 def update_translation_file(apiResponse, keys, languageKey, retried=False):
