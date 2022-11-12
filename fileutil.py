@@ -4,7 +4,7 @@ from typing import Dict
 ENCODING = "utf-8-sig"
 
 
-def readFile(file) -> Dict:
+def load_json(file) -> Dict:
   try:
     with open(file, mode="r", encoding=ENCODING) as file:
       data = json.load(file)
@@ -18,7 +18,7 @@ def readFile(file) -> Dict:
   return data
 
 
-def writeFile(file, data: Dict, **kwargs) -> None:
+def write_json(file, data: Dict, **kwargs) -> None:
   try:
     with open(file, mode="w", encoding=ENCODING) as file:
       json.dump(data, file, **kwargs)

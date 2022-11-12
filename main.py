@@ -4,67 +4,73 @@ import math
 
 from dotenv import load_dotenv
 from config.env import Env
-from api import getTranslationsFor
+from api import get_translations_for
 from typing import List, Dict
-from fileutil import readFile, writeFile
+from fileutil import load_json, write_json
 load_dotenv()
 
-BATCH_SIZE = 20
-LOCK_FILE_PREFIX = re.sub("\W", "-", Env.getRootDir())+"-"
+BATCH_SIZE = Env.get_batch_size()
+LOCK_FILE_PREFIX = re.sub("\W", "-", Env.get_root_dir())+"-"
 
 
-def loadDefaultI18n():
-  return readFile(f"{Env.getRootDir()}/en.json")
+def load_default_translation():
+  return load_json(f"{Env.get_root_dir()}/en.json")
 
 
-def getKeys(allKeys: List[str], languageKey: str):
-  filename = f".lock/{LOCK_FILE_PREFIX}" + languageKey + ".mo"
+def get_keys(allKeys: List[str], languageKey: str):
+  filename = get_lock_filename(languageKey)
   final_keys: List[str] = []
   try:
-    translatedMap: Dict = readFile(filename)
+    translated_map: Dict = load_json(filename)
   except FileNotFoundError as e:
-    writeFile(filename, {})
+    write_json(filename, {})
     return allKeys
   else:
     for key in allKeys:
-      if not translatedMap.get(key, None):
+      if not translated_map.get(key, None):
         final_keys.append(key)
 
   return final_keys
 
 
-def updateLockFile(successKeys, languageKey):
-  filename = f".lock/{LOCK_FILE_PREFIX}" + languageKey + ".mo"
-  lockMap: Dict = readFile(filename)
+def get_lock_filename(languageKey):
+  return f".lock/{LOCK_FILE_PREFIX}" + languageKey + ".mo"
+
+
+def update_lock_file(successKeys, languageKey):
+  filename = get_lock_filename(languageKey)
+  lockMap: Dict = load_json(filename)
   for key in successKeys:
     lockMap.update({key: 1})
+  #write_json(filename, lockMap)
 
-  writeFile(filename, lockMap)
 
-
-def updateTranslationFile(apiResponse, keys, languageKey, retried=False):
-  filename = f"{Env.getRootDir()}/"+languageKey+".json"
+def update_translation_file(apiResponse, keys, languageKey, retried=False):
+  filename = get_translation_filename(languageKey)
   try:
     translation: Dict = {}
-    translation = readFile(filename)
-    responseArray = apiResponse["data"]["translations"]
-    for index, obj in enumerate(responseArray):
+    translation = load_json(filename)
+    for index, obj in enumerate(apiResponse):
       translated_text = obj["translatedText"]
       translation.update({keys[index]: translated_text})
-    writeFile(filename, translation, indent=2, ensure_ascii=False)
+    write_json(filename, translation, indent=2, ensure_ascii=False)
   except FileNotFoundError as e:
     if not retried:
-      writeFile(filename, {})
-      updateTranslationFile(apiResponse, keys, languageKey, retried=True)
+      write_json(filename, {})
+      update_translation_file(apiResponse, keys, languageKey, retried=True)
     else:
       print("Oops there was some error creating the file", e)
 
 
-def validLanguages(targetLangs: List[str]):
-  jsonMap: Dict = readFile("valid_languages.json")
-  validLanguages = list(
+def get_translation_filename(languageKey):
+  return f"{Env.get_root_dir()}/"+languageKey+".json"
+
+
+def are_valid_languages(targetLangs: List[str]):
+  jsonMap: Dict = load_json("valid_languages.json")
+  supported_languages = list(
       map(lambda x: x.get("language"), jsonMap["data"]["languages"]))
-  return set(targetLangs).issubset(set(validLanguages))
+  return set(targetLangs).issubset(set(supported_languages))
 
 
 def run(target: List[str] = None, verbose=False):
@@ -73,22 +79,23 @@ def run(target: List[str] = None, verbose=False):
     target.remove("en")
     if len(target) < 1:
       return
-  if not validLanguages(target):
+  if not are_valid_languages(target):
     print("Given targets does not seems to be a valid language")
     return
   if verbose:
     print("Target languages", target)
     print("Loading default translation file i.e 'en.json'")
-  map: dict = loadDefaultI18n()
+  map: dict = load_default_translation()
   if map is not None:
     all_keys = list(map.keys())
     if verbose:
       print(f"Total keys defined in default translation file {len(all_keys)}")
 
     for languageKey in target:
-      print("="*80)
-      print(f"Checking keys to be translated for language {languageKey}")
-      final_keys = getKeys(all_keys, languageKey)
+      if verbose:
+        print("=" * 80)
+        print(f"Checking keys to be translated for language {languageKey}")
+      final_keys = get_keys(all_keys, languageKey)
       l = len(final_keys)
       if l > 0:
         if verbose:
@@ -98,13 +105,17 @@ def run(target: List[str] = None, verbose=False):
         for p in range(0, pages):
           batch_keys = final_keys[p * BATCH_SIZE: p * BATCH_SIZE + BATCH_SIZE]
           batch_values = [map[i] for i in batch_keys]
-          result = getTranslationsFor(batch_values, languageKey)
+          result, raw_response = get_translations_for(
+              batch_values, languageKey)
+          if not result:
+            print("\nError: Api did not return results as expected\n", raw_response)
+            return
           if verbose:
             print("Translation Api Response Success")
-          updateTranslationFile(result, batch_keys, languageKey)
+          update_translation_file(result, batch_keys, languageKey)
           if verbose:
             print(f"'{languageKey}' translation file updated")
-          updateLockFile(batch_keys, languageKey)
+          update_lock_file(batch_keys, languageKey)
           if verbose:
             print(f"Lock file of '{languageKey}' language updated")
 
@@ -123,4 +134,4 @@ if __name__ == "__main__":
   try:
     run(target=str(args.target).split(sep=","), verbose=args.verbose)
   except Exception as e:
-    print(e)
+    print(e.with_traceback())

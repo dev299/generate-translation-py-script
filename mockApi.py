@@ -6,7 +6,7 @@
 #     ]
 #   }
 # }
-def getDummyResponse(length: int):
+def get_dummy_response(length: int):
   map = {"data": {
       "translations": []
   }}
