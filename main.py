@@ -96,7 +96,7 @@ def run(target: List[str] = None, verbose=False):
           print(f"Creating batch of {BATCH_SIZE} keys")
         pages = math.ceil(l/BATCH_SIZE)
         for p in range(0, pages):
-          batch_keys = all_keys[p * BATCH_SIZE: p * BATCH_SIZE + BATCH_SIZE]
+          batch_keys = final_keys[p * BATCH_SIZE: p * BATCH_SIZE + BATCH_SIZE]
           batch_values = [map[i] for i in batch_keys]
           result = getTranslationsFor(batch_values, languageKey)
           if verbose:
